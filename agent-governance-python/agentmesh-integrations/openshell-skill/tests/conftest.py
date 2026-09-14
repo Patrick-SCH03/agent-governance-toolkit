@@ -15,7 +15,7 @@ import os
 import sys
 import threading
 import types
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any
 
@@ -63,6 +63,7 @@ class Verdict:
     reason: str | None = None
     message: str | None = None
     transform: Transform | None = None
+    approval: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,8 @@ class HostSession:
         )
         if (
             self.mode is EnforcementMode.ENFORCE
-            and result.verdict.decision is Decision.ESCALATE
+            and result.verdict.decision is Decision.DENY
+            and result.verdict.approval is not None
         ):
             try:
                 _run_sync(
@@ -119,19 +121,20 @@ class HostSession:
                     )
                 )
             except Exception:
-                return InterventionPointResult(
-                    verdict=Verdict(
+                return replace(
+                    result,
+                    verdict=replace(
+                        result.verdict,
                         decision=Decision.DENY,
-                        reason=result.verdict.reason,
-                        message=result.verdict.message,
-                    )
+                        reason="host_error:approval_resolver_failed",
+                    ),
                 )
-            return InterventionPointResult(
-                verdict=Verdict(
+            return replace(
+                result,
+                verdict=replace(
+                    result.verdict,
                     decision=Decision.ALLOW,
-                    reason=result.verdict.reason,
-                    message=result.verdict.message,
-                )
+                ),
             )
         return result
 

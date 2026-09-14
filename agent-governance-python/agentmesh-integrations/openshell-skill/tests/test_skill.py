@@ -100,7 +100,9 @@ def test_native_acs_manifest_allows_and_denies_shell_actions() -> None:
     allow_skill = GovernanceSkill(
         acs.AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=allow_policy)
     )
-    command, outcome = allow_skill.authorize_shell_command(["git", "status"], api="test")
+    command, outcome = allow_skill.authorize_shell_command(
+        ["git", "status"], api="test"
+    )
     assert command == ["git", "status"]
     assert outcome.verdict.decision is acs.Decision.ALLOW
     assert allow_policy.invocations[0]["input"]["tool"]["name"] == "shell.execute"
@@ -151,20 +153,14 @@ def test_builds_canonical_pre_tool_call_snapshot(
     assert snapshot["envelope"]["session"]["id"] == "sandbox-42"
 
 
-@pytest.mark.parametrize(
-    ("decision", "effective_decision"),
-    [
-        (acs.Decision.DENY, acs.Decision.DENY),
-        (acs.Decision.ESCALATE, acs.Decision.DENY),
-    ],
-)
-def test_non_permitting_verdicts_raise(
-    decision: acs.Decision, effective_decision: acs.Decision
-) -> None:
+@pytest.mark.parametrize("decision", [acs.Decision.DENY, acs.Decision.ESCALATE])
+def test_non_permitting_verdicts_raise(decision: acs.Decision) -> None:
     skill = GovernanceSkill(FakeControl([result(decision, reason="blocked")]))
     with pytest.raises(ShellPolicyViolation, match="blocked") as caught:
         skill.authorize_shell_command(["danger"], api="test")
-    assert caught.value.result.verdict.decision is effective_decision
+    # Legacy ESCALATE is non-permitting and remains unchanged. Current ACS
+    # resolves approvals only for DENY carrying an approval block.
+    assert caught.value.result.verdict.decision is decision
 
 
 @pytest.mark.parametrize("decision", [acs.Decision.ALLOW, acs.Decision.WARN])
@@ -227,15 +223,55 @@ def test_governed_subprocess_executes_allowed_command() -> None:
     assert args["context"] == {"operation": "version-check"}
 
 
-def test_governed_subprocess_does_not_execute_denied_command(tmp_path: Path) -> None:
+@pytest.mark.parametrize("decision", [acs.Decision.DENY, acs.Decision.ESCALATE])
+def test_governed_subprocess_does_not_execute_denied_command(
+    tmp_path: Path, decision: acs.Decision
+) -> None:
     marker = tmp_path / "must-not-exist"
-    skill = GovernanceSkill(FakeControl([result(acs.Decision.DENY)]))
+    skill = GovernanceSkill(FakeControl([result(decision)]))
     with governed_shell(skill):
         with pytest.raises(ShellPolicyViolation):
             subprocess.run(
                 [sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"]
             )
     assert not marker.exists()
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_approval_resolution_controls_subprocess_execution(
+    tmp_path: Path, approved: bool
+) -> None:
+    marker = tmp_path / "approval-required"
+    outcome = acs.InterventionPointResult(
+        verdict=acs.Verdict(
+            decision=acs.Decision.DENY, reason="needs-approval", approval={}
+        )
+    )
+
+    class ApprovalControl(FakeControl):
+        def __init__(self) -> None:
+            super().__init__([outcome])
+            self.enforced = 0
+
+        async def enforce(self, point: Any, result: Any, mode: Any) -> None:
+            self.enforced += 1
+            if not approved:
+                raise RuntimeError("approval unavailable")
+
+    control = ApprovalControl()
+    command = [sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"]
+    with governed_shell(GovernanceSkill(control)):
+        if approved:
+            subprocess.run(command, check=True)
+        else:
+            with pytest.raises(
+                ShellPolicyViolation, match="host_error:approval_resolver_failed"
+            ) as caught:
+                subprocess.run(command, check=True)
+            assert caught.value.result.verdict.decision is acs.Decision.DENY
+            assert caught.value.result.verdict.approval == {}
+    assert control.enforced > 0
+    assert marker.exists() is approved
 
 
 def test_transform_is_applied_before_subprocess_execution() -> None:
