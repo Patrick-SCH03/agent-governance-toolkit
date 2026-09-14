@@ -8,6 +8,8 @@
 # --- African regulatory policy terms ---
 # --- CloudEvents / signed audit-event terms ---
 # --- Docker / BuildKit toolchain terms ---
+struction
+
 # --- Documentation site and ACS integration terms ---
 # --- EU AI Act regulatory role terms ---
 # --- Flowise integration terms ---
@@ -530,6 +532,7 @@ fromtimestamp
 frontmatter
 frozenset
 fsdecode
+fsencode
 fspath
 fullmatch
 gazetted
@@ -745,6 +748,7 @@ noresolver
 normalisation
 normalised
 normalises
+normcase
 normpath
 nostr
 nother
@@ -1011,6 +1015,7 @@ typeerror
 typer
 typosquat
 typosquats
+udcff
 tzdata
 ufeff
 unaliased
@@ -1019,6 +1024,7 @@ unconfigured
 unicodedata
 uninspectable
 unioned
+unkeyed
 unmigrated
 unparse
 unparseable
@@ -1070,6 +1076,68 @@ workflows
 workiq
 workstream
 worktree
+
+# --- African regulatory policy terms ---
+POPIA
+popia
+NDPA
+ndpa
+NFIU
+nfiu
+CBN
+BVN
+NIN
+NIMC
+nimc
+vnin
+vNIN
+NIBSS
+nibss
+tokenised
+Anambra
+Kogi
+crossborder
+crossstate
+offence
+authorisation
+authorised
+geofencing
+geofence
+geomatch
+YYMMDDGSSSCAZ
+
+# --- TRACE / identity-chain / advisory terms ---
+agentrust
+contextvars
+miyannishar
+GHSA
+ghsa
+
+# --- ACS / crypto terms ---
+preimage
+
+# --- Flowise integration terms ---
+chatflow
+Chatflows
+
+# --- Test code terms ---
+interp
+ncat
+netcat
+socat
+nmap
+tcpdump
+filterwarnings
+simplefilter
+subn
+
+# --- Azure credential pattern terms (used in credential_redactor regexes) ---
+accountkey
+sharedaccesssignature
+sharedaccesskey
+
+isascii
+multisink
 writeln
 writerow
 wslc
