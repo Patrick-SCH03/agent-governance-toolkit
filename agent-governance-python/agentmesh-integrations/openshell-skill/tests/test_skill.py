@@ -18,7 +18,7 @@ from openshell_agentmesh import GovernanceSkill, ShellPolicyViolation, governed_
 from openshell_agentmesh.cli import main as cli_main
 
 
-_NATIVE_MANIFEST = """agent_control_specification_version: 0.3.0-alpha-agt
+_NATIVE_MANIFEST = """agent_control_specification_version: 0.4.0-alpha.1
 metadata:
   name: openshell_adapter_scenarios
 extends: []
