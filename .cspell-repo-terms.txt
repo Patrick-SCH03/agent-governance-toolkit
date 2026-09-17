@@ -1273,3 +1273,5 @@ propagation
 readonly
 resolver
 sha256sum
+EBADENGINE
+hono
