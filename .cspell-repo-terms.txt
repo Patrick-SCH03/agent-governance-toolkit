@@ -6,6 +6,7 @@
 # --- ACS / crypto terms ---
 # --- Additional West/North Africa terms flagged by cspell ---
 # --- African regulatory policy terms ---
+# --- UK regulatory policy terms ---
 # --- CloudEvents / signed audit-event terms ---
 # --- Docker / BuildKit toolchain terms ---
 struction
@@ -26,11 +27,13 @@ struction
 # Egypt PDPL regex fragments (word stems used in pattern matching)
 # Fictitious order-reference prefix used in a Ghana Card regex regression test
 # Ghana
+# GitHub handle, credited in docs/dependency-audits/2026-08-12-agent-governance-sdk-5-cli-packages.md
 # Mauritius (no new abbreviations beyond PDPC)
 # Rwanda
 # Shared currency / country codes used in messages
 # Test name in the TypeScript approval-protocol suite (#3200)
 # URL hostnames in policy file references
+# YAML ordered-map tag (!!omap), cited in dependency audits
 # discarded-verdict census (tests/test_transform_never_dropped.py)
 # dorny/paths-filter — GitHub Actions dependency used in policy-validation.yml
 # git fetch destination-ref syntax, spell-check.yml base fetch
@@ -48,8 +51,13 @@ AILLM
 AKIA
 AKIAFAKE
 AKIAFAKEFORTEST
+AKIAAAAAAAAAAAAAAAAA
+AKIAIOSFODNN
+AKIAXXXX
+fooghp
 AKIDEXAMPLE
 APIM
+APPI
 ASGI
 ATF
 AUXV
@@ -79,6 +87,7 @@ CISA
 CMVK
 CODEOWNERS
 COSE
+Caldicott
 Cdecl
 Centralised
 Chatflows
@@ -94,6 +103,8 @@ DEVNULL
 DISCARDABLE
 DOTALL
 DPC
+DSPT
+DUAA
 DYLD
 DataQualityEvidence
 Dedup
@@ -190,6 +201,7 @@ Nanvix
 NemoClaw
 Nemotron
 Normalise
+OAEP
 OCSP
 OLLAMA
 ORAS
@@ -200,9 +212,13 @@ OpenClaw
 PCRE
 PDPC
 PDPL
+PECR
+PIHBOs
 PIICRI
+PIPEDA
 PKCS
 POPIA
+PRIN
 PSMODULEPATH
 PYTHONHOME
 PYTHONPATH
@@ -233,6 +249,7 @@ Rootfs
 RustCrypto
 RustSec
 Rwandan
+SECP
 SGHA
 SIEM
 SIGSTOP
@@ -242,6 +259,7 @@ SPKI
 SQLGLOT
 SSEMCP
 SVID
+SYSC
 SYSTEMDRIVE
 SYSTEMROOT
 Sandboxed
@@ -506,6 +524,7 @@ exfiltrat
 exfiltrated
 exfiltration
 expanduser
+exponentials
 externalidentity
 fastapi
 fastembed
@@ -523,6 +542,7 @@ fmean
 fnmatch
 fnmatchcase
 folderlocation
+footgun
 formedness
 fria
 fromisoformat
@@ -600,8 +620,11 @@ isalnum
 isascii
 isatty
 isawaitable
+isclose
 iscoroutine
+iscoroutinefunction
 isdigit
+isdir
 isdisjoint
 isfile
 isfinite
@@ -644,10 +667,15 @@ langflow
 langgenius
 lawcontinue
 levelname
+lookahead
+lookaround
+lookarounds
+lookbehind
 liamcrumm
 libagent
 libc
 licen
+lifecycles
 linkcheck
 linkified
 linkpkg
@@ -659,6 +687,9 @@ lockdown
 lockfile
 lockfiles
 logdir
+logit
+logits
+logprob
 logprobs
 loopback
 lotl
@@ -738,6 +769,7 @@ nfiu
 nmap
 nonblocking
 nonconformant
+nonfinite
 nonimport
 nonlocal
 nono
@@ -753,6 +785,7 @@ normpath
 nostr
 nother
 notrequirements
+noverify
 npmjs
 nsecure
 ntpath
@@ -765,6 +798,7 @@ octo
 octocat
 offence
 offences
+omap
 omitempty
 oncall
 oneshot
@@ -817,6 +851,8 @@ popitem
 popleft
 posixpath
 posonlyargs
+preauthorize
+prayagupa
 preimage
 prependpath
 pretool
@@ -919,6 +955,7 @@ sanitisation
 sanitised
 sarif
 sboms
+sbyte
 scak
 schemaversion
 scikit
@@ -962,6 +999,7 @@ slugification
 smol
 snupkg
 socat
+softmax
 spacy
 spanid
 specversion
@@ -1024,6 +1062,7 @@ unconfigured
 unicodedata
 uninspectable
 unioned
+unlogged
 unkeyed
 unmigrated
 unparse
@@ -1130,6 +1169,7 @@ tcpdump
 filterwarnings
 simplefilter
 subn
+recwarn
 
 # --- Azure credential pattern terms (used in credential_redactor regexes) ---
 accountkey
@@ -1152,5 +1192,31 @@ zerotrie
 zerovec
 zmij
 zoneinfo
+warmpool
+sandboxwarmpool
+sandboxtemplate
+KUBECONFIG
+subshell
+subshells
+nohup
+doas
+redirections
+karimad
 رقم
 قومي
+GPAI
+Harmonised
+
+# --- audit_backends.py / govern.py fail-closed-error comment terms (PR #3916) ---
+CREAT
+ELOOP
+ENOSPC
+EPERM
+FCHMOD
+WRONLY
+containerised
+fchmod
+fileno
+fromhex
+fstat
+serialisation

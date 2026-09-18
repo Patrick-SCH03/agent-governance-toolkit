@@ -25,6 +25,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `runtime=` plus explicit `SandboxConfig`.
 
 ### Fixed
+- **.NET numeric equality/inequality in policy-rule conditions** -- `PolicyRule` conditions such as `count == 5` and `score != 3.14` now evaluate numeric literals (integers, decimals, and negatives) instead of failing to match, and numeric `!=` matches when the field is missing or non-numeric so deny rules fail closed. Numeric operands are parsed with the invariant culture so evaluation is deterministic across host locales (#3205).
+- **`agent-governance-toolkit-core` and `[full]` no longer require `agt-policies`
+  as a base dependency.** `agt-policies>=5.1.0` (requiring an unpublished
+  `agent-control-specification>=0.4.0b0`) had become a base dependency, blocking
+  `pip install`. Moved `agt-policies` to an opt-in `migrate` extra, existing
+  `agt migrate` users now need `pip install agent-governance-toolkit-core[migrate]`,
+  and made `agent-control-specification>=0.4.0b0,<0.5.0` a direct base
+  dependency instead, matching the version `agent_os` actually requires. A
+  resolvable PyPI install of `agent-governance-toolkit-core` still depends on
+  `agent-control-specification` 0.4.0b0 and `agt-policies` 5.1.0 being
+  published, tracked in #4019.
+- **Credential redactor boundary anchors (TypeScript, Rust, Python)** ,
+  `AuditLogger` (TypeScript) and `CredentialRedactor` (Rust) contained
+  boundary anchors that treated `_` (and, for OpenAI/Google, `-`) as
+  boundary-blocking characters, so a valid secret annotated with `_old` or
+  preceded by `session_` passed through unredacted. TypeScript now uses
+  `(?<![A-Za-z0-9])` / `(?![A-Za-z0-9])` lookaround anchors; Rust
+  `is_left_boundary_char` / `is_right_boundary_char` now reject only ASCII
+  alphanumerics (plus `-` for Slack, with a Google hyphen superset exception).
+  In Python, the OpenAI right anchor is updated from `\b` to
+  `(?![A-Za-z0-9])` (the remaining boundary anchors were fixed on main by
+  #3853). The `content_scanner.py` SSN pattern in `agent-rag-governance` is
+  also updated to accept space and dot separators and use the consistent
+  lookaround anchor, closing the detection-disagreement gap with
+  `credential_redactor.py` (#3933, #3815). C# fixes will land separately
+  in #3934.
 - **Spell check no longer reports the base branch's own history as a
   contributor's changes** — `scripts/ci/changed_lines.py` diffed from the tip of
   the base branch, so on a branch behind `main` every line `main` had since
