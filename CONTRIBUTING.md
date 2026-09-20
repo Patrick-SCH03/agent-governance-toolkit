@@ -51,6 +51,14 @@ source .venv/bin/activate        # Linux/macOS
 # (Required for all local development to ensure you test against local core changes)
 pip install --no-cache-dir --no-deps -e agent-governance-toolkit-core
 
+# Install the local agent-hypervisor stub before agent-mesh. agent-mesh[dev]
+# requires agent_hypervisor>=5.0.0, but PyPI currently only has the
+# pre-consolidation 3.7.0 wheel. Installing that wheel also duplicates the
+# top-level `hypervisor` package included by the local core build, causing
+# import-time conflicts. This package-specific setup only needs the stub to
+# satisfy agent-mesh[dev].
+pip install --no-cache-dir --no-deps -e agent-hypervisor
+
 # Install the package you are working on in editable mode
 pip install -e "agent-os[dev]"       # Policy engine
 pip install -e "agent-mesh[dev]"     # Identity/trust layer
@@ -300,6 +308,10 @@ cd agent-governance-toolkit
 # Install the core package from the local source to avoid dependency conflicts
 pip install --no-cache-dir --no-deps -e "agent-governance-python/agent-governance-toolkit-core"
 
+# Install agent-hypervisor before agent-mesh for the same reason described above.
+# Keep the dev extra here because the full test suite includes hypervisor tests.
+pip install -e "agent-governance-python/agent-hypervisor[dev]"
+
 pip install -e "agent-governance-python/agent-primitives[dev]"
 pip install -e "agent-governance-python/agent-mcp-governance[dev]"
 pip install -e "agent-governance-python/agent-os[dev]"
@@ -309,7 +321,6 @@ pip install -e "agent-governance-python/agent-sre[dev]"
 pip install -e "agent-governance-python/agent-compliance[dev]"
 pip install -e "agent-governance-python/agent-marketplace[dev]"  # installs agentmesh-marketplace
 pip install -e "agent-governance-python/agent-lightning[dev]"
-pip install -e "agent-governance-python/agent-hypervisor[dev]"
 pip install -e "agent-governance-python/agentmesh-integrations[dev]"
 
 # Restore the standalone .NET SDK when working in that path
