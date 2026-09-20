@@ -94,9 +94,11 @@ Chatflows
 Clendenen
 CommonMark
 Convs
+conftest
 Cpus
 CrewAI
 CuriousHet
+getfixturevalue
 Cybercrimes
 DACL
 DEVNULL
@@ -109,6 +111,8 @@ DYLD
 DataQualityEvidence
 Dedup
 Defence
+demotes
+demoting
 Deque
 Deserialise
 Diffable
@@ -389,6 +393,7 @@ bytecount
 caas
 cands
 canonicality
+capitalised
 caplog
 capsys
 carloshvp
@@ -582,6 +587,7 @@ gomod
 governancekernel
 governancepolicy
 governorate
+granit
 grpc
 gunicorn
 gvisor
@@ -674,6 +680,7 @@ lookbehind
 liamcrumm
 libagent
 libc
+libyaml
 licen
 lifecycles
 linkcheck
@@ -764,6 +771,7 @@ neutralised
 neutralises
 neutralising
 newpartner
+newtype
 newurl
 nfiu
 nmap
@@ -806,6 +814,7 @@ oorandom
 opencode
 openpolicyagent
 openshell
+organisation
 organisational
 organisations
 oserror
@@ -954,6 +963,7 @@ sandboxing
 sandboxprovider
 sanitisation
 sanitised
+saphyr
 sarif
 sboms
 sbyte
