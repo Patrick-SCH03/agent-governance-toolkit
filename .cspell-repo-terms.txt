@@ -37,6 +37,8 @@ struction
 # discarded-verdict census (tests/test_transform_never_dropped.py)
 # dorny/paths-filter — GitHub Actions dependency used in policy-validation.yml
 # git fetch destination-ref syntax, spell-check.yml base fetch
+# git diff --numstat output format
+numstat
 AACS
 AAIF
 AARM
@@ -1225,3 +1227,9 @@ fileno
 fromhex
 fstat
 serialisation
+
+# --- advisory.py / govern.py async advisory support terms (PR #4052) ---
+acall
+Acall
+acheck
+unroutable

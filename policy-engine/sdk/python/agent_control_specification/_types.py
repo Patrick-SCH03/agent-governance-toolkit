@@ -6,10 +6,11 @@ import hashlib
 import json
 import warnings
 from enum import Enum, IntEnum
-from typing import Any, Mapping, MutableMapping, Sequence, Union
+from typing import Mapping, MutableMapping, Sequence, TypeAlias, Union
 
-JsonValue = Any
-JsonObject = MutableMapping[str, JsonValue]
+# Read-only containers so narrower caller payloads (dict[str, str], tuples) still type-check.
+JsonValue: TypeAlias = bool | int | float | str | None | Sequence["JsonValue"] | Mapping[str, "JsonValue"]
+JsonObject: TypeAlias = MutableMapping[str, JsonValue]
 
 
 class InterventionPoint(str, Enum):
@@ -159,7 +160,7 @@ class Warning:
     message: str | None = None
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, JsonValue]) -> "Warning":
+    def from_mapping(cls, value: JsonValue) -> "Warning":
         if not isinstance(value, Mapping):
             raise ValueError("warning must be a mapping")
         reason = value.get("reason")
