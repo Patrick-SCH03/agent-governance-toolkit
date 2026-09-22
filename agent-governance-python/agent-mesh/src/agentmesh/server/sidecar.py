@@ -213,6 +213,7 @@ class PolicyLoadGeneration(BaseModel):
     policies_failed: int
     directory_status: Literal["available", "unavailable", "not_loaded"]
     files: tuple[PolicyFileLoad, ...]
+    startup_warnings: tuple[str, ...] = ()
 
 
 # ── Internal state ───────────────────────────────────────────────────
@@ -295,6 +296,15 @@ def _load_policies() -> PolicyLoadGeneration:
     if failed or directory_status == "unavailable":
         policy_set_status = "degraded"
 
+    startup_warnings: tuple[str, ...] = ()
+    if len(files) - failed == 0:
+        warning = (
+            f"Startup validation: no policies loaded from {_policy_dir}; "
+            "all evaluations will be denied by default until policies are loaded."
+        )
+        logger.warning(warning)
+        startup_warnings = (warning,)
+
     generation = PolicyLoadGeneration(
         policy_set_id="sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         policy_set_status=policy_set_status,
@@ -303,6 +313,7 @@ def _load_policies() -> PolicyLoadGeneration:
         policies_failed=failed,
         directory_status=directory_status,
         files=tuple(files),
+        startup_warnings=startup_warnings,
     )
     serialized = generation.model_dump_json()
     _policy_state = (engine, generation)
