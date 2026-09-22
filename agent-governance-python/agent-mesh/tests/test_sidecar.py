@@ -36,9 +36,9 @@ class TestHealthProbes:
 
     def test_ready(self, client):
         resp = client.get("/ready")
-        assert resp.status_code == 200
+        assert resp.status_code == 503
         data = resp.json()
-        assert data["status"] == "ready"
+        assert data["status"] == "not-ready"
         assert "policies_loaded" in data
 
     def test_ready_reports_startup_warning_when_no_policies(self, caplog, tmp_path):
@@ -50,10 +50,12 @@ class TestHealthProbes:
                 with TestClient(app) as client:
                     resp = client.get("/ready")
 
+        assert resp.status_code == 503
         data = resp.json()
         assert data["policies_loaded"] == 0
-        assert data["startup_warnings"]
-        assert any("Startup validation: no policies loaded" in msg for msg in caplog.messages)
+        assert data["effective_rules"] == 0
+        assert data["load_warnings"]
+        assert any("Policy load validation: no effective rules loaded" in msg for msg in caplog.messages)
 
     def test_healthz(self, client):
         resp = client.get("/healthz")
@@ -62,8 +64,8 @@ class TestHealthProbes:
 
     def test_readyz(self, client):
         resp = client.get("/readyz")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ready"
+        assert resp.status_code == 503
+        assert resp.json()["status"] == "not-ready"
 
 
 class TestMetricsEndpoint:
@@ -134,7 +136,7 @@ class TestPolicyEvaluation:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "reloaded"
-        assert "startup_warnings" in data
+        assert "load_warnings" in data
 
 
 class TestPolicyWithFiles:

@@ -67,7 +67,6 @@
     "tomli",
     "fastapi",
     "starlette",
-    "readyz",
     "structlog",
     "scipy",
     "chromadb",

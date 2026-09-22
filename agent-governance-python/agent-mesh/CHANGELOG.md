@@ -115,6 +115,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Empty policy sets are visible to readiness probes.** The policy server and
+  governance sidecar now return `503 Not Ready` when no enabled policy rules
+  are loaded. Policy and generation status responses expose `effective_rules`
+  and `load_warnings` so operators can distinguish an empty policy set from a
+  healthy deployment.
 - **Pending-message batch isolation.** A single malformed entry in a relay-supplied
   `pending_messages` batch no longer aborts the drain; the failure is surfaced
   through the error handler and the remaining queued messages are still delivered.

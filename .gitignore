@@ -20,7 +20,6 @@ venv/
 htmlcov/
 .coverage
 *.cover
-.DS_Store
 
 # Node
 node_modules/

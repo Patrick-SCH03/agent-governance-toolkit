@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 app = create_base_app(
     "policy-server",
     "Evaluates governance policies against agent actions.",
+    include_readyz=False,
 )
 
 POLICY_DIR = os.getenv("AGENTMESH_POLICY_DIR", "/etc/agentmesh/policies")
@@ -38,39 +39,34 @@ _engine: PolicyEngine = PolicyEngine()
 _trust_policies: list[TrustPolicy] = []
 _trust_evaluator: PolicyEvaluator | None = None
 _loaded_count: int = 0
+_effective_rule_count: int = 0
 _load_warnings: list[str] = []
 
 
-# Replace the generic readiness route so an empty policy set is visible to
-# Kubernetes and operators instead of being reported as ready.
-app.router.routes = [
-    route for route in app.router.routes if getattr(route, "path", None) != "/readyz"
-]
-
-
 @app.get("/readyz", tags=["health"], response_model=None)
-async def readyz() -> JSONResponse | dict[str, object]:
+async def readyz() -> JSONResponse:
     payload = {
-        "status": "ready" if _loaded_count > 0 else "not-ready",
+        "status": "ready" if _effective_rule_count > 0 else "not-ready",
         "component": "policy-server",
         "total_loaded": _loaded_count,
+        "effective_rules": _effective_rule_count,
         "policy_dir": POLICY_DIR,
         "load_warnings": list(_load_warnings),
     }
-    if _loaded_count == 0:
+    if _effective_rule_count == 0:
         return JSONResponse(status_code=503, content=payload)
-    return payload
+    return JSONResponse(content=payload)
 
 
 def _validate_load_warnings() -> None:
-    """Record a warning when a load completes without any policies."""
+    """Record a warning when a load completes without effective rules."""
     global _load_warnings
 
     _load_warnings = []
-    if _loaded_count == 0:
+    if _effective_rule_count == 0:
         warning = (
-            f"Startup validation: no policies loaded from {POLICY_DIR}; "
-            "all evaluations will be denied by default until policies are loaded."
+            f"Policy load validation: no effective rules loaded from {POLICY_DIR}; "
+            "readiness remains blocked until an enabled policy rule is loaded."
         )
         logger.warning(warning)
         _load_warnings.append(warning)
@@ -78,33 +74,35 @@ def _validate_load_warnings() -> None:
 
 def _load_policies() -> None:
     """Load all YAML/JSON policy files from POLICY_DIR."""
-    global _engine, _trust_policies, _trust_evaluator, _loaded_count
+    global _engine, _trust_policies, _trust_evaluator, _loaded_count, _effective_rule_count
 
     policy_path = Path(POLICY_DIR)
-    if not policy_path.exists():
-        logger.warning("Policy directory %s does not exist", POLICY_DIR)
-        if _loaded_count == 0:
-            _validate_load_warnings()
-        return
+    if not policy_path.is_dir():
+        raise RuntimeError(
+            f"Policy directory {POLICY_DIR} does not exist or is not a directory; "
+            "refusing to load an undefined policy set"
+        )
 
     # Load into locals first; assign globals only after all files succeed.
     # A failed reload (POST /api/v1/policy/reload) must not leave a
     # partially loaded engine live (#3536 review feedback).
     local_engine = PolicyEngine()
-    local_trust: list = []
+    local_trust: list[TrustPolicy] = []
     governance_count = 0
+    effective_rule_count = 0
     errors: list[tuple[str, Exception]] = []
 
     for f in sorted(policy_path.glob("*.yaml")):
         gov_exc = None
         try:
-            local_engine.load_yaml(f.read_text())
+            policy = local_engine.load_yaml(f.read_text(encoding="utf-8"))
             governance_count += 1
+            effective_rule_count += sum(rule.enabled for rule in policy.rules)
             logger.info("Loaded governance policy: %s", f.name)
         except Exception as ge:
             gov_exc = ge
             try:
-                tp = TrustPolicy.from_yaml(f.read_text())
+                tp = TrustPolicy.from_yaml(f)
                 local_trust.append(tp)
                 logger.info("Loaded trust policy: %s", f.name)
             except Exception:
@@ -114,8 +112,9 @@ def _load_policies() -> None:
 
     for f in sorted(policy_path.glob("*.json")):
         try:
-            local_engine.load_json(f.read_text())
+            policy = local_engine.load_json(f.read_text(encoding="utf-8"))
             governance_count += 1
+            effective_rule_count += sum(rule.enabled for rule in policy.rules)
         except Exception as exc:
             errors.append((f.name, exc))
 
@@ -136,6 +135,9 @@ def _load_policies() -> None:
     _trust_evaluator = PolicyEvaluator(_trust_policies) if _trust_policies else None
 
     _loaded_count = governance_count + len(_trust_policies)
+    _effective_rule_count = effective_rule_count + sum(
+        len(policy.rules) for policy in _trust_policies
+    )
     logger.info(
         "Loaded %d governance + %d trust policies",
         governance_count,
@@ -231,6 +233,7 @@ async def list_policies() -> dict[str, Any]:
     """List all loaded policies."""
     return {
         "total_loaded": _loaded_count,
+        "effective_rules": _effective_rule_count,
         "trust_policies": len(_trust_policies),
         "policy_dir": POLICY_DIR,
         "load_warnings": list(_load_warnings),
@@ -244,6 +247,7 @@ async def reload_policies() -> dict[str, Any]:
     return {
         "status": "reloaded",
         "total_loaded": _loaded_count,
+        "effective_rules": _effective_rule_count,
         "trust_policies": len(_trust_policies),
         "load_warnings": list(_load_warnings),
     }
