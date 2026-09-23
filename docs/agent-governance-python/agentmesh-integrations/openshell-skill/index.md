@@ -5,7 +5,6 @@ owner: docs-team
 ---
 
 <meta http-equiv="refresh" content="0; url=../../../integrations/openshell/#option-a-governance-skill-inside-the-sandbox-python-library">
-<link rel="canonical" href="../../../integrations/openshell/">
 
 # OpenShell integration moved
 

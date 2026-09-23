@@ -6,9 +6,9 @@ owner: docs-team
 
 # OpenShell integration
 
-> **Status:** The OpenShell-specific `GovernanceSkill` library was retired in the
-> v5 ACS migration. This page preserves the migration path for existing
-> integrations; it does not describe a supported OpenShell-specific adapter.
+> **Status:** The v5 ACS migration retired the OpenShell-specific
+> `GovernanceSkill` library. This page preserves the migration guidance and the
+> former documentation route for existing integrations.
 
 ## Govern an OpenShell-hosted agent
 
@@ -33,17 +33,16 @@ for the current runtime and policy-authoring guidance.
 
 ### Option A: Governance Skill Inside the Sandbox (Python Library)
 
-The pre-v5 `openshell-agentmesh` package is retained only for compatibility.
-Importing `openshell_agentmesh` emits a `DeprecationWarning`; the
-`GovernanceSkill`, `ShellPolicyViolation`, and `governed_shell` APIs are no
-longer available. Replace that integration with an ACS manifest and host-level
-intervention-point evaluation.
+The v5 `openshell-agentmesh` package is retained only for compatibility.
+Importing `openshell_agentmesh` emits a `DeprecationWarning`; the v5 package
+does not provide the `GovernanceSkill`, `ShellPolicyViolation`, or
+`governed_shell` APIs. For a v5 deployment, replace that integration with an
+ACS manifest and host-level intervention-point evaluation.
 
-There is no OpenShell-specific replacement package. The ACS runtime is the
-supported path for applying governance to an agent hosted in an OpenShell
-sandbox.
+The ACS runtime is the v5 migration path for applying governance to an agent
+hosted in an OpenShell sandbox.
 
 ## Related guidance
 
-- [V5 removal and migration guidance](../v4-removal.md)
+- [V4 policy language removal and migration guidance](../v4-removal.md)
 - [Agent Control Specification package guide](../packages/agent-control-specification.md)
