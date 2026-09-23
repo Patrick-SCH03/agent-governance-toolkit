@@ -124,7 +124,14 @@
     "webmcp",
     "webmachinelearning",
     "clusterfuzzlite",
-    "eqnull"
+    "eqnull",
+    "chacha",
+    "chacha20",
+    "getrandom",
+    "spki",
+    "zerocopy",
+    "rngs",
+    "keygen"
   ],
   "ignorePaths": [
     "**/node_modules/**",
