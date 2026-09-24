@@ -606,6 +606,14 @@ view handles combinations such as `ur\u00adg3nt!`; numeric error codes such as
 once, even when several views match. The previous normalization view is retained
 so mixed old and newly covered invisible characters do not remove existing
 matches. At most eight distinct views are checked per message.
+The public `detection_texts(text)` helper returns these views; the guardian
+computes them once and shares them across all three detectors.
+
+**Numeric retry trade-off:** digits separated by invisible characters, such as
+`4\u200b0\u200b1` or `id 40\u00ad3`, now count as error turns because they
+normalize to `401` or `403`. Even benign-looking identifiers can therefore
+contribute to the retry limit. This is intentional parity with the existing
+plain-text error-code rules, not a new inference of malicious intent.
 
 Normalization is for detection only: transcript previews and hashes still use
 the original message. Invisible characters alone do not trigger an alert.

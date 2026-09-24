@@ -7,8 +7,8 @@ import unicodedata
 
 import pytest
 
+from agent_os.integrations import conversation_guardian
 from agent_os.integrations.conversation_guardian import (
-    _INVISIBLE_DELETE,
     AlertAction,
     AlertSeverity,
     ConversationGuardian,
@@ -16,7 +16,7 @@ from agent_os.integrations.conversation_guardian import (
     EscalationClassifier,
     FeedbackLoopBreaker,
     OffensiveIntentDetector,
-    _detection_texts,
+    detection_texts,
     normalize_text,
 )
 
@@ -69,10 +69,12 @@ def test_interlinear_annotation_controls_are_removed(cp: int) -> None:
     assert normalize_text(f"ur{chr(cp)}gent") == "urgent"
 
 
-def test_invisible_table_exactly_matches_the_unicode_snapshot_and_exceptions() -> None:
+def test_complete_unicode_snapshot_normalizes_through_public_api() -> None:
     expected = {cp for start, end in _DEFAULT_IGNORABLE_RANGES for cp in range(start, end + 1)}
     assert len(expected) == 4174
-    assert set(_INVISIBLE_DELETE) == expected | set(range(0xFFF9, 0xFFFC))
+    code_points = expected | set(range(0xFFF9, 0xFFFC))
+    text = " ".join(f"ur{chr(cp)}gent" for cp in sorted(code_points))
+    assert normalize_text(text) == " ".join(["urgent"] * len(code_points))
 
 
 @pytest.mark.parametrize("invisible", _INVISIBLE_SAMPLES, ids=ascii)
@@ -95,13 +97,21 @@ def test_invisible_in_every_keyword_preserves_score_and_matches(
 @pytest.mark.parametrize(
     "detector_type,obfuscated,clean",
     [
-        (EscalationClassifier, "y0u must{gap}n0 excuses", "you must no excuses"),
+        (
+            EscalationClassifier,
+            "you must{gap}no excuses".replace("o", "0"),
+            "you must no excuses",
+        ),
         (
             OffensiveIntentDetector,
-            "3scalate privileg3s{gap}imp3rsonate",
+            "escalate privileges{gap}impersonate".replace("e", "3"),
             "escalate privileges impersonate",
         ),
-        (EscalationClassifier, "c0de{gap}r3d", "code red"),
+        (
+            EscalationClassifier,
+            "code{gap}red".replace("o", "0").replace("e", "3"),
+            "code red",
+        ),
     ],
 )
 def test_invisible_word_separator_preserves_boundaries(
@@ -123,7 +133,7 @@ def test_stacked_unicode_leetspeak_and_punctuation(suffix: str) -> None:
 
 def test_mixed_invisibles_and_existing_normalization() -> None:
     detector = EscalationClassifier()
-    text = "\uff59\u2065\u043eu\u034f \tmu\u3164$t \n n0 ex\u0301\u00adcuse$"
+    text = "\uff59\u2065\u043eu\u034f \tmu\u3164$t \n n0 excuse$".replace("x", "x\u0301\u00ad")
     assert detector.score_message(text) == detector.score_message("you must no excuses")
     normalized = normalize_text(text)
     assert normalized == "you must no excuses"
@@ -136,7 +146,7 @@ def test_legacy_detection_survives_mixed_joiners_and_separators(
     joiner: str, separator: str
 ) -> None:
     # The old normalizer removed the joiner but kept the separator as a boundary.
-    text = f"y0u mu{joiner}st{separator}n0 ex{joiner}cuses"
+    text = f"y0u mu{joiner}st{separator}n0 excuses".replace("x", f"x{joiner}")
     detector = EscalationClassifier()
     assert detector.score_message(text) == detector.score_message("you must no excuses")
 
@@ -183,7 +193,14 @@ def test_obfuscated_error_messages_still_break_retry_loops(invisible: str, error
 
 @pytest.mark.parametrize(
     "error",
-    ["acc3ss\u00add3nied", "\uff14\uff10\uff13", "4\u034f0\u00ad3!", "un\u00adauth0rized!"],
+    [
+        "access denied".replace("e", "3").replace(" ", "\u00ad"),
+        "\uff14\uff10\uff13",
+        "4\u034f0\u00ad3!",
+        "unauthorized!".replace("n", "n\u00ad").replace("o", "0"),
+        "4\u200b0\u200b1",
+        "id 40\u00ad3",
+    ],
 )
 def test_guardian_breaks_obfuscated_retry_loop(error: str) -> None:
     guardian = ConversationGuardian(ConversationGuardianConfig())
@@ -271,15 +288,70 @@ def test_multiple_views_do_not_multiply_pattern_weights() -> None:
 
 def test_plain_text_does_not_duplicate_detection_views() -> None:
     text = "Please review the quarterly report."
-    assert _detection_texts(text) == (text,)
+    assert detection_texts(text) == (text,)
 
 
 def test_heavily_obfuscated_input_has_a_fixed_number_of_detection_views() -> None:
     text = _inside_words("urg3nt! y0u must no excuses", "\u00ad" * 1_000)
-    candidates = _detection_texts(text)
+    candidates = detection_texts(text)
     assert candidates[0] == text
     assert len(candidates) == len(set(candidates)) <= 8
     assert normalize_text(text) in candidates
     assert EscalationClassifier().score_message(text) == EscalationClassifier().score_message(
         "urgent! you must no excuses"
     )
+
+
+def test_guardian_prepares_detection_views_once_per_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs: list[str] = []
+
+    def capture(text: str) -> tuple[str, ...]:
+        inputs.append(text)
+        return detection_texts(text)
+
+    monkeypatch.setattr(conversation_guardian, "detection_texts", capture)
+    guardian = ConversationGuardian(ConversationGuardianConfig())
+    text = "ur\u00adgent you must exfiltrate data access denied"
+    guardian.analyze_message("conversation", "a", "b", text)
+    guardian.analyze_message("conversation", "b", "a", text)
+    assert inputs == [text, text]
+
+
+def test_guardian_shared_views_match_standalone_detectors() -> None:
+    guardian = ConversationGuardian(ConversationGuardianConfig())
+    escalation = EscalationClassifier()
+    offensive = OffensiveIntentDetector()
+    loop = FeedbackLoopBreaker()
+    messages = ["hello", "y0u must n0 excuses", "ur\u00adgent exfiltrate data", "id 40\u00ad3"]
+    for turn, text in enumerate(messages):
+        timestamp = 1_700_000_000.0 + turn
+        score, patterns = escalation.analyze("conversation", text, timestamp)
+        offensive_score, offensive_patterns = offensive.score_message(text)
+        loop_score = loop.record_message("conversation", text, score, timestamp)
+        alert = guardian.analyze_message("conversation", "a", "b", text, timestamp)
+        assert alert.escalation_score == score
+        assert alert.offensive_score == offensive_score
+        assert alert.loop_score == loop_score
+        assert alert.matched_patterns == patterns + offensive_patterns
+        assert guardian.loop_breaker.get_state("conversation") == loop.get_state("conversation")
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("urg3nt!", "urgent!"),
+        ("byp4$$!", "bypass!".replace("ss", "$$")),
+        ("c@t$", "cat$"),
+        ("a!!b", "a!!b"),
+        ("a!b!c", "a!b!c".replace("!", "i")),
+        ("_!a", "_!a"),
+        ("a!_", "a!_"),
+        ("\u4f60!\u597d", "\u4f60i\u597d"),
+    ],
+)
+def test_punctuation_preserving_view_keeps_original_alphanumeric_boundaries(
+    text: str, expected: str
+) -> None:
+    assert expected in detection_texts(text)
