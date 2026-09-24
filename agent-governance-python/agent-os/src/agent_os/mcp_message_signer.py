@@ -7,13 +7,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import logging
 import secrets
 import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Callable
+from datetime import UTC, datetime, timedelta
 
 from agent_os.mcp_protocols import (
     InMemoryNonceStore,
@@ -45,16 +46,16 @@ class MCPVerificationResult:
     failure_reason: str | None = None
 
     @classmethod
-    def success(cls, payload: str, sender_id: str | None) -> "MCPVerificationResult":
+    def success(cls, payload: str, sender_id: str | None) -> MCPVerificationResult:
         return cls(is_valid=True, payload=payload, sender_id=sender_id)
 
     @classmethod
-    def failed(cls, reason: str) -> "MCPVerificationResult":
+    def failed(cls, reason: str) -> MCPVerificationResult:
         return cls(is_valid=False, failure_reason=reason)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MCPMessageSigner:
@@ -64,6 +65,11 @@ class MCPMessageSigner:
     replay window so previously accepted messages cannot be replayed
     indefinitely. Persistence and nonce generation are injectable to support
     deterministic tests and external storage backends.
+
+    Signatures use the versioned v2 canonical encoding. Both peers must
+    upgrade together; legacy delimiter-based signatures are never accepted.
+    Integrity verification does not replace sender authorization or payload
+    policy checks.
     """
 
     def __init__(
@@ -116,7 +122,7 @@ class MCPMessageSigner:
         self._last_cleanup = _utcnow()
 
     @classmethod
-    def from_base64_key(cls, base64_key: str) -> "MCPMessageSigner":
+    def from_base64_key(cls, base64_key: str) -> MCPMessageSigner:
         """Build a signer from a base64-encoded shared secret.
 
         Args:
@@ -163,11 +169,6 @@ class MCPMessageSigner:
             A signed envelope containing the payload, nonce, timestamp, and
             computed signature.
         """
-        if payload is None:
-            raise ValueError("payload must not be None")
-        if not payload.strip():
-            raise ValueError("payload must not be empty")
-
         timestamp = _utcnow()
         nonce = self._nonce_generator()
         signature = self._compute_signature(
@@ -280,8 +281,27 @@ class MCPMessageSigner:
         sender_id: str | None,
         payload: str,
     ) -> str:
-        timestamp_ms = int(timestamp.timestamp() * 1000)
-        return f"{nonce}|{timestamp_ms}|{sender_id or ''}|{payload}"
+        """Encode typed fields without ambiguous boundaries or precision loss."""
+        if not isinstance(payload, str) or not payload.strip():
+            raise ValueError("payload must be a non-empty string")
+        if not isinstance(nonce, str) or not nonce.strip():
+            raise ValueError("nonce must be a non-empty string")
+        if sender_id is not None and not isinstance(sender_id, str):
+            raise ValueError("sender_id must be a string or None")
+        if not isinstance(timestamp, datetime) or timestamp.utcoffset() is None:
+            raise ValueError("timestamp must be a timezone-aware datetime")
+
+        return json.dumps(
+            [
+                "agent-os:mcp-message:v2",
+                nonce,
+                timestamp.astimezone(UTC).isoformat(timespec="microseconds"),
+                sender_id,
+                payload,
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
 
     def _maybe_cleanup_locked(self, now: datetime) -> None:
         if now - self._last_cleanup >= self.nonce_cache_cleanup_interval:
