@@ -631,6 +631,7 @@ imran
 inheritdoc
 initialisation
 initialised
+injective
 innererror
 inspectable
 interp
@@ -1125,6 +1126,7 @@ userinfo
 usize
 utcfromtimestamp
 utcnow
+utcoffset
 uvicorn
 venv
 venvs
