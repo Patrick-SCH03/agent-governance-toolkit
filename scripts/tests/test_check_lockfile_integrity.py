@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import check_lockfile_integrity as cli  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
@@ -133,7 +132,194 @@ def test_parse_npm_lockfile_rejects_invalid_integrity():
             "node_modules/x": {"version": "1.0.0", "integrity": "not-a-real-sri"},
         }
     })
-    assert cli.parse_npm_lockfile(content, "x.json") == []
+    entries = cli.parse_npm_lockfile(content, "x.json")
+    assert len(entries) == 1
+    assert entries[0].ecosystem == "npm-integrity-suspicious"
+
+
+def test_parse_npm_lockfile_sha1_only_is_error_not_skipped():
+    content = _make_npm_lock(("typescript", "7.0.2", _sri(b"x", "sha1")))
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert len(entries) == 1
+    assert entries[0].ecosystem == "npm-integrity-suspicious"
+    report = cli.Report()
+    cli.verify_entries(entries, report, npm_fetcher=lambda n, v: _sri(b"x"))
+    assert len(report.errors) == 1
+    assert "SHA1-only" in report.errors[0].message
+
+
+def test_parse_npm_lockfile_sha1_plus_strong_is_error():
+    content = _make_npm_lock(("typescript", "7.0.2", f"{_sri(b'x', 'sha1')} {_sri(b'x')}"))
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert entries[0].ecosystem == "npm-integrity-suspicious"
+
+
+@pytest.mark.parametrize("version", ["1.0.0\n", "1.0.0/../x", 7])
+def test_parse_npm_lockfile_malformed_version_is_error(version):
+    content = json.dumps({"packages": {
+        "node_modules/pkg": {"version": version, "integrity": _sri(b"x")},
+    }})
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert len(entries) == 1
+    assert entries[0].ecosystem == "npm-integrity-suspicious"
+    report = cli.Report()
+    cli.verify_entries(entries, report)
+    assert len(report.errors) == 1
+    assert "npm version or integrity" in report.errors[0].message
+
+
+def test_lockfile_only_transitive_alias_poisoning_fails_even_with_matching_hash(tmp_path):
+    sri = _sri(b"published-evil-artifact")
+    base = {"packages": {
+        "node_modules/parent": {
+            "version": "1.0.0", "integrity": sri,
+            "dependencies": {"lodash": "1.0.0"},
+        },
+        "node_modules/lodash": {"version": "1.0.0", "integrity": sri},
+    }}
+    changed = json.loads(json.dumps(base))
+    changed["packages"]["node_modules/parent"]["dependencies"]["lodash"] = "npm:evil@1.0.0"
+    changed["packages"]["node_modules/lodash"].update({
+        "name": "evil", "resolved": "https://registry.npmjs.org/evil/-/evil-1.0.0.tgz",
+    })
+    lockfile = tmp_path / "package-lock.json"
+    lockfile.write_text(json.dumps(changed), encoding="utf-8")
+    calls = []
+
+    def fake_registry(name, version):
+        calls.append((name, version))
+        return sri
+
+    report = cli.run(
+        [str(lockfile)], base_ref="base", max_deps=10,
+        npm_fetcher=fake_registry,
+        read_base=lambda ref, path: json.dumps(base),
+    )
+    assert report.errors
+    assert any("invalid declaration" in finding.message for finding in report.errors)
+    assert ("evil", "1.0.0") not in calls
+
+
+def test_parse_npm_lockfile_resolves_canonical_aliases():
+    sri = _sri(b"typescript")
+    content = json.dumps({"packages": {
+        "": {"devDependencies": {
+            "@typescript/native": "npm:typescript@7.0.2",
+            "typescript": "npm:@typescript/typescript6@6.0.2",
+        }},
+        "node_modules/typescript": {
+            "name": "@typescript/typescript6", "version": "6.0.2",
+            "integrity": sri,
+            "resolved": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
+            "dependencies": {"@typescript/old": "npm:typescript@^6"},
+        },
+        "node_modules/@typescript/native": {
+            "name": "typescript", "version": "7.0.2", "integrity": sri,
+            "resolved": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+        },
+        "node_modules/@typescript/old": {
+            "name": "typescript", "version": "6.0.3", "integrity": sri,
+            "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
+        },
+    }})
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert {(e.name, e.version) for e in entries} == {
+        ("typescript", "7.0.2"), ("typescript", "6.0.3"),
+        ("@typescript/typescript6", "6.0.2"),
+    }
+    calls = []
+
+    def fetch(name, version):
+        calls.append((name, version))
+        return sri
+
+    report = cli.Report()
+    cli.verify_entries(entries, report, npm_fetcher=fetch)
+    assert report.errors == []
+    assert set(calls) == {("typescript", "7.0.2"),
+                          ("typescript", "6.0.3"),
+                          ("@typescript/typescript6", "6.0.2")}
+
+
+@pytest.mark.parametrize("tamper", [
+    {"name": "evil-typescript"},
+    {"resolved": "https://evil.example.com/typescript-7.0.2.tgz"},
+    {"resolved": "https://registry.npmjs.org/typescript/-/typescript-7.0.1.tgz"},
+    {"name": ["typescript"]},
+])
+def test_parse_npm_lockfile_rejects_forged_alias(tamper):
+    info = {
+        "name": "typescript", "version": "7.0.2", "integrity": _sri(b"x"),
+        "resolved": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+    }
+    info.update(tamper)
+    content = json.dumps({"packages": {
+        "": {"devDependencies": {"@typescript/native": "npm:typescript@7.0.2"}},
+        "node_modules/@typescript/native": info,
+    }})
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert len(entries) == 1
+    assert entries[0].ecosystem == "npm-alias-suspicious"
+    report = cli.Report()
+    cli.verify_entries(entries, report)
+    assert len(report.errors) == 1
+
+
+def test_parse_npm_lockfile_rejects_malformed_alias_declaration():
+    content = json.dumps({"packages": {
+        "": {"devDependencies": {"@typescript/native": "npm:typescript@7.0.2/../evil"}},
+        "node_modules/@typescript/native": {
+            "name": "typescript", "version": "7.0.2", "integrity": _sri(b"x"),
+            "resolved": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+        },
+    }})
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert entries
+    assert all(entry.ecosystem == "npm-alias-suspicious" for entry in entries)
+
+
+def test_malformed_alias_does_not_hide_other_lockfile_entries():
+    sri = _sri(b"x")
+    content = json.dumps({"packages": {
+        "": {"dependencies": {"alias": "npm:typescript@../../evil"}},
+        "node_modules/good": {"version": "1.0.0", "integrity": sri},
+    }})
+    entries = cli.parse_npm_lockfile(content, "package-lock.json")
+    assert {entry.ecosystem for entry in entries} == {"npm-alias-suspicious", "npm"}
+    assert any(entry.name == "good" for entry in entries)
+
+
+def test_fetch_npm_integrity_uses_canonical_scoped_identity(monkeypatch):
+    sri = _sri(b"x")
+    calls = []
+
+    def fake_http(url, *, allowed_hosts):
+        calls.append((url, allowed_hosts))
+        return {"name": "@typescript/typescript6", "version": "6.0.2",
+                "dist": {"integrity": sri}}
+
+    monkeypatch.setattr(cli, "_http_get_json", fake_http)
+    assert cli.fetch_npm_integrity("@typescript/typescript6", "6.0.2") == sri
+    assert calls == [("https://registry.npmjs.org/@typescript/typescript6/6.0.2",
+                      (cli.NPM_HOST,))]
+
+
+def test_fetch_npm_integrity_rejects_wrong_registry_identity(monkeypatch):
+    monkeypatch.setattr(cli, "_http_get_json", lambda url, *, allowed_hosts: {
+        "name": "typescript", "version": "6.0.2",
+        "dist": {"integrity": _sri(b"x")},
+    })
+    with pytest.raises(cli.RegistryError, match="identity mismatch"):
+        cli.fetch_npm_integrity("@typescript/typescript6", "6.0.2")
+
+
+def test_fetch_npm_integrity_rejects_unsafe_version_before_network(monkeypatch):
+    def fail_fetch(*args, **kwargs):
+        pytest.fail("unsafe version reached the network")
+
+    monkeypatch.setattr(cli, "_http_get_json", fail_fetch)
+    with pytest.raises(cli.RegistryError, match="invalid npm version"):
+        cli.fetch_npm_integrity("typescript", "7.0.2\n")
 
 
 def test_parse_npm_lockfile_unparseable():
@@ -152,7 +338,12 @@ def test_parse_npm_lockfile_rejects_log_injection_name():
             "node_modules/evil\n\x1b[31m": {"version": "1.0.0", "integrity": sri},
         }
     })
-    assert cli.parse_npm_lockfile(content, "x.json") == []
+    entries = cli.parse_npm_lockfile(content, "x.json")
+    assert len(entries) == 1
+    assert entries[0].ecosystem == "npm-alias-suspicious"
+    report = cli.Report()
+    cli.verify_entries(entries, report)
+    assert len(report.errors) == 1
 
 
 # ---------------------------------------------------------------------------
