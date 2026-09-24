@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-"""Adversarial regression tests for MCP signed-envelope canonicalization."""
+"""Adversarial regression tests for MCP signed-envelope canonicalization.
+
+Reframing cases and the collision-matrix approach derive from #3507 and #3508.
+"""
 
 from __future__ import annotations
 
@@ -97,10 +100,10 @@ def test_legacy_signatures_are_rejected_without_fallback(sender, payload, fixed_
 
 
 def test_canonical_encoding_is_injective_over_adversarial_fields():
-    values = ("", "|", "a|", "|a", "a|b", "1:a", "2:ab", "-", "\\", '"', "\x00", "\n")
-    nonblank_values = tuple(value for value in values if value.strip())
-    nonces = ("n",) + nonblank_values
-    payloads = ("p",) + nonblank_values
+    values = ("", "|", "a|", "|a", "a|b", ",", "]", '["', "null", "\\", '"', "\x00", "\n", "a\nb")
+    non_blank_values = tuple(value for value in values if value.strip())
+    nonces = ("n",) + non_blank_values
+    payloads = ("p",) + non_blank_values
     senders = (None,) + values
     timestamps = (NOW, NOW + timedelta(microseconds=1))
     encodings = set()

@@ -1,6 +1,6 @@
 ---
 title: "MCP Security Gateway -- Version 1.0"
-last_reviewed: 2026-09-24
+last_reviewed: 2026-09-25
 owner: agt-maintainers
 ---
 
@@ -591,8 +591,8 @@ A signed envelope MUST contain:
 
 | Field | Type | Required | Default | Constraints |
 | --- | --- | --- | --- | --- |
-| `payload` | string | Yes | -- | Nonblank serialized message payload |
-| `nonce` | string | Yes | -- | Nonblank, unique nonce for replay protection |
+| `payload` | string | Yes | -- | Non-blank serialized message payload |
+| `nonce` | string | Yes | -- | Non-blank, unique nonce for replay protection |
 | `timestamp` | string | Yes | -- | ISO 8601 timestamp with timezone and full microsecond precision |
 | `signature` | string | Yes | -- | HMAC-SHA256 signature (base64-encoded) |
 | `sender_id` | string or null | No | null | Optional sender identifier |

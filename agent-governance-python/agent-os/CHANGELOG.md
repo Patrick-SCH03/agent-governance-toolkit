@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   timestamps at full microsecond precision. Both peers must upgrade together
   and preserve timestamp precision; legacy signatures are rejected without
   fallback. Malformed fields fail closed without consuming valid nonces.
+  For `None` or blank payloads, `sign_message` still raises `ValueError`, but
+  its message is now `payload must be a non-empty string` rather than
+  `payload must not be None` or `payload must not be empty`. Update callers
+  that match the old exception text.
   See the [signing specification](../../docs/specs/MCP-SECURITY-GATEWAY-1.0.md#7-message-signing)
   for the encoding, migration, and authorization boundaries.
 - Bound email local-part and Basic-auth URI scheme scans to prevent quadratic scanning on separator-dense input (#3566), based on dev404ai's implementation in #3575. Fail-closed detection may match package prerelease versions; with `redact_pii=True`, an overlong email local part retains its prefix before the final 64 characters.

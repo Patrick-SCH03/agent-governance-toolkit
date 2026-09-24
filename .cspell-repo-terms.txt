@@ -1066,6 +1066,7 @@ testserver
 textwrap
 thiserror
 timedelta
+timespec
 tinyrainbow
 tinystr
 tinytemplate
