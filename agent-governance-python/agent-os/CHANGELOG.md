@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **Breaking: MCP signed-envelope hardening** (#3507): `MCPMessageSigner` now
+  signs a domain-separated v2 JSON array instead of delimiter-joined fields.
+  This prevents sender/payload and nonce/timestamp boundary reframing,
+  distinguishes absent from empty senders, and authenticates timestamps at
+  full microsecond precision. Both peers must upgrade together and preserve
+  timestamp precision; legacy signatures are rejected without fallback.
+  Malformed fields fail closed without consuming valid nonces. Nonce claims
+  are now atomic: custom `MCPNonceStore.add` implementations must reject live
+  duplicates with the new public `DuplicateNonceError`, including across
+  concurrent verifiers sharing a store. Live nonces remain protected under
+  capacity pressure. See the [signing specification](../../docs/specs/MCP-SECURITY-GATEWAY-1.0.md#7-message-signing)
+  for the encoding, migration, and authorization boundaries.
 - Bound email local-part and Basic-auth URI scheme scans to prevent quadratic scanning on separator-dense input (#3566), based on dev404ai's implementation in #3575. Fail-closed detection may match package prerelease versions; with `redact_pii=True`, an overlong email local part retains its prefix before the final 64 characters.
 - **Agent OS security & integrity hardening** ([#3247](https://github.com/microsoft/agent-governance-toolkit/pull/3247)) — five governance gaps closed so `agent_os` fails closed when gating and recording untrusted activity:
   - `MCPMessageSigner` / `InMemoryNonceStore` no longer evict in-window nonces by count. The nonce store keeps every nonce for its full replay window and, when saturated with live nonces, raises `NonceStoreCapacityError` so verification fails closed instead of re-opening the replay window. (New public export: `NonceStoreCapacityError`.)
