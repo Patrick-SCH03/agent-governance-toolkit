@@ -230,7 +230,11 @@ def test_parse_npm_lockfile_rejects_alias_with_unsafe_target():
             "node_modules/alias3": {"version": "npm:react-is@^18", "integrity": sri},
         }
     })
-    assert cli.parse_npm_lockfile(content, "x.json") == []
+    entries = cli.parse_npm_lockfile(content, "x.json")
+    report = cli.Report()
+    cli.verify_entries(entries, report)
+    assert len(report.errors) == 3
+    assert all(e.ecosystem == "npm-alias-invalid" for e in entries)
 
 
 # ---------------------------------------------------------------------------
@@ -1044,3 +1048,21 @@ def test_run_git_caps_stdout(monkeypatch):
     # more bytes; we don't assert exact length because git's own output
     # is short.
     assert len(out.encode("utf-8")) <= cli.MAX_GIT_STDOUT_BYTES + 64
+
+
+@pytest.mark.parametrize("metadata", [
+    {"name": "../react-is"}, {"name": ""}, {"name": None},
+    {"name": "react-is\n"}, {"version": "npm:react-is@^18"},
+])
+def test_malformed_alias_produces_integrity_error_without_registry(metadata):
+    tree = {"packages": {"node_modules/react-is": {
+        "version": "18.3.1", "integrity": _sri(b"payload"), **metadata,
+    }}}
+    entries = cli.parse_npm_lockfile(json.dumps(tree), "package-lock.json")
+    report = cli.Report()
+    def no_fetch(*args):
+        pytest.fail("malformed alias must not reach registry")
+    cli.verify_entries(entries, report, npm_fetcher=no_fetch)
+    assert report.checked == 1
+    assert len(report.errors) == 1
+    assert "invalid npm alias" in report.errors[0].message

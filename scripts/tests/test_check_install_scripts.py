@@ -176,14 +176,15 @@ def test_lockfile_v3_name_equal_to_path_is_not_an_alias():
     assert list(cis._extract_lockfile_pairs(tree)) == [("@scope/pkg", "1.0.0")]
 
 
-def test_lockfile_v3_alias_with_unsafe_target_dropped():
+def test_lockfile_v3_alias_with_unsafe_target_rejected():
     tree = {
         "lockfileVersion": 3,
         "packages": {
             "node_modules/alias": {"name": "evil name", "version": "1.0.0"},
         },
     }
-    assert cis._extract_lockfile_pairs(tree) == {}
+    with pytest.raises(cis.InvalidAlias):
+        cis._extract_lockfile_pairs(tree)
 
 
 def test_lockfile_v1_alias_version_spec_queries_real_package():
@@ -523,3 +524,38 @@ def test_main_deadline_unscanned_becomes_finding():
             "--strict",
         ])
     assert rc == 1
+
+
+@pytest.mark.parametrize("metadata", [
+    {"name": "../react-is"}, {"name": ""}, {"name": None},
+    {"name": "react-is\n"}, {"version": "npm:react-is@^18"},
+])
+def test_malformed_alias_fails_install_cli_without_registry(metadata):
+    tree = {"packages": {"node_modules/react-is": {
+        "version": "18.3.1", "hasInstallScript": True, **metadata,
+    }}}
+    with patch.object(common, "changed_manifests", return_value=["package-lock.json"]), \
+         patch.object(common, "load_json_at", side_effect=lambda rev, path: tree if rev == "HEAD" else {}), \
+         patch.object(cis, "fetch_install_scripts") as fetch:
+        assert cis.main_with_args(["--strict"]) == 1
+        fetch.assert_not_called()
+
+
+def test_repaired_alias_is_checked_even_when_base_is_invalid():
+    def load(rev, path):
+        return {"packages": {"node_modules/alias": {
+            "name": "react-is" if rev == "HEAD" else "../react-is",
+            "version": "18.3.1", "hasInstallScript": True,
+        }}}
+    with patch.object(common, "changed_manifests", return_value=["package-lock.json"]), \
+         patch.object(common, "load_json_at", side_effect=load), \
+         patch.object(cis, "fetch_install_scripts", return_value={}) as fetch:
+        assert cis.main_with_args(["--strict"]) == 0
+        fetch.assert_called_once_with("react-is", "18.3.1")
+
+
+def test_malformed_legacy_alias_is_rejected():
+    with pytest.raises(cis.InvalidAlias):
+        cis._extract_lockfile_pairs({"dependencies": {
+            "alias": {"version": "npm:react-is@^18"},
+        }})

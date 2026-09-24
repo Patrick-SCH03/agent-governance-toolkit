@@ -259,6 +259,8 @@ def parse_npm_lockfile(content: str, path: str) -> list[LockEntry]:
     and an ``integrity`` field are returned. Workspace roots (empty key)
     and link/symlink entries (no integrity) are deliberately skipped — they
     do not represent registry-installable artifacts.
+
+    Malformed alias metadata produces an error sentinel for verify_entries().
     """
     try:
         data = json.loads(content)
@@ -292,9 +294,25 @@ def parse_npm_lockfile(content: str, path: str) -> list[LockEntry]:
         # spec (lockfile v1). Look up the real package, not the alias,
         # which does not exist on the registry.
         real_name = info.get("name")
+        invalid_name = "name" in info and (
+            not isinstance(real_name, str)
+            or len(real_name) > MAX_IDENT_LEN
+            or NPM_NAME_RE.fullmatch(real_name) is None
+        )
+        alias = NPM_ALIAS_RE.fullmatch(version)
+        invalid_alias = version.startswith("npm:") and (
+            alias is None
+            or NPM_NAME_RE.fullmatch(alias.group("name")) is None
+            or VERSION_RE.fullmatch(alias.group("version")) is None
+        )
+        if invalid_name or invalid_alias:
+            entries.append(LockEntry(
+                ecosystem="npm-alias-invalid", name=name, version=version,
+                integrity=integrity, location=f"{path}:{key}",
+            ))
+            continue
         if isinstance(real_name, str) and real_name != name:
             name = real_name
-        alias = NPM_ALIAS_RE.match(version)
         if alias:
             name = alias.group("name")
             version = alias.group("version")
@@ -910,6 +928,11 @@ def verify_entries(
                             f"of {len(upstream_set)} digest(s)"
                         ),
                     ))
+            elif entry.ecosystem == "npm-alias-invalid":
+                report.add(Finding(
+                    severity="error", entry=entry,
+                    message="invalid npm alias metadata; registry identity cannot be verified",
+                ))
             elif entry.ecosystem == "npm-suspicious":
                 # Sentinel for multi-token-same-algorithm SRI in the
                 # lockfile (e.g. ``sha512-EVIL sha512-LEGIT``). ssri/npm
