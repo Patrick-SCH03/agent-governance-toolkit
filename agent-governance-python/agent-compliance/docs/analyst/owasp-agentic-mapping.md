@@ -286,6 +286,8 @@ with governor.monitor(agent_id="research-bot"):
 **Implementation:**
 
 ```python
+import time
+
 from agent_sre.cascade.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -314,6 +316,7 @@ slo = SLO(
 )
 
 def call_agent(task):
+    started = time.monotonic()
     try:
         result = breaker.call(agent.run, task)
     except CircuitOpenError:
@@ -323,6 +326,7 @@ def call_agent(task):
         slo.record_event(good=False)
         raise
     availability.record_task(success=True)
+    latency_p99.record_latency((time.monotonic() - started) * 1000)
     slo.record_event(good=True)
     return result
 ```
