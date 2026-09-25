@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from agent_os.mcp_protocols import (
+    DuplicateNonceError,
     InMemoryNonceStore,
     MCPNonceStore,
     NonceStoreCapacityError,
@@ -115,8 +116,10 @@ class MCPMessageSigner:
         self.nonce_cache_cleanup_interval = nonce_cache_cleanup_interval
         self.max_nonce_cache_size = max_nonce_cache_size
         self._lock = threading.Lock()
-        self._nonce_store = nonce_store or InMemoryNonceStore(
-            max_entries=max_nonce_cache_size,
+        self._nonce_store = (
+            nonce_store
+            if nonce_store is not None
+            else InMemoryNonceStore(max_entries=max_nonce_cache_size)
         )
         self._nonce_generator = nonce_generator or (lambda: uuid.uuid4().hex)
         self._last_cleanup = _utcnow()
@@ -206,12 +209,6 @@ class MCPMessageSigner:
             if age > self.replay_window or age < -self.replay_window:
                 return MCPVerificationResult.failed("Message timestamp outside replay window.")
 
-            with self._lock:
-                self._maybe_cleanup_locked(now)
-                if self._nonce_store.has(envelope.nonce):
-                    logger.warning("Duplicate MCP nonce detected: %s", envelope.nonce)
-                    return MCPVerificationResult.failed("Duplicate nonce (replay detected).")
-
             # Verify HMAC before committing the nonce to prevent an
             # attacker from burning valid nonces with forged signatures.
             expected_signature = self._compute_signature(
@@ -224,19 +221,29 @@ class MCPMessageSigner:
                 return MCPVerificationResult.failed("Invalid signature.")
 
             with self._lock:
+                # Signature computation or lock contention can outlast the window.
+                now = _utcnow()
+                age = now - envelope.timestamp
+                if age > self.replay_window or age < -self.replay_window:
+                    return MCPVerificationResult.failed("Message timestamp outside replay window.")
+                self._maybe_cleanup_locked(now)
                 try:
+                    # Avoid duplicate write attempts; add() guarantees cross-signer atomicity.
+                    if self._nonce_store.has(envelope.nonce):
+                        raise DuplicateNonceError("Nonce already accepted.")
                     self._nonce_store.add(
                         envelope.nonce,
                         envelope.timestamp + self.replay_window,
                     )
+                except DuplicateNonceError:
+                    logger.warning("Duplicate MCP nonce detected.")
+                    return MCPVerificationResult.failed("Duplicate nonce (replay detected).")
                 except NonceStoreCapacityError:
                     logger.warning(
                         "Nonce store saturated with in-window nonces; rejecting "
                         "message to preserve replay protection (fail-closed)."
                     )
-                    return MCPVerificationResult.failed(
-                        "Nonce store at capacity (fail-closed)."
-                    )
+                    return MCPVerificationResult.failed("Nonce store at capacity (fail-closed).")
 
             return MCPVerificationResult.success(envelope.payload, envelope.sender_id)
         except Exception as exc:
