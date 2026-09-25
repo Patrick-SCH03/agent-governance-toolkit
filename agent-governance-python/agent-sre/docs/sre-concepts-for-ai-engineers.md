@@ -106,7 +106,7 @@ hallucination.record_evaluation(hallucinated=False)
 An SLO combines your SLIs into a reliability target with a time window. It answers the question: **"Is my agent reliable enough?"**
 
 ```python
-from agent_sre import SLO, ErrorBudget
+from agent_sre.slo.objectives import SLO, ErrorBudget
 
 slo = SLO(
     name="customer-support-agent",
@@ -388,7 +388,7 @@ A complete example — define SLOs, set cost guardrails, and detect incidents in
 ```python
 """Monitor an AI agent with SRE best practices."""
 
-from agent_sre import SLO, ErrorBudget
+from agent_sre.slo.objectives import SLO, ErrorBudget
 from agent_sre.slo.indicators import TaskSuccessRate, CostPerTask, HallucinationRate
 from agent_sre.cost.guard import CostGuard
 from agent_sre.cascade.breaker import CircuitBreaker, CircuitBreakerConfig
