@@ -1454,6 +1454,19 @@ function tokenizeShellCommands(commandText) {
       continue;
     }
 
+    if (character === "#" && !tokenStarted) {
+      while (index + 1 < input.length && input[index + 1] !== "\n" && input[index + 1] !== "\r") {
+        index += 1;
+      }
+      finishCommand();
+      if (input[index + 1] === "\r" && input[index + 2] === "\n") {
+        index += 2;
+      } else if (input[index + 1] === "\n" || input[index + 1] === "\r") {
+        index += 1;
+      }
+      continue;
+    }
+
     if (character === "'" || character === '"') {
       quote = character;
       tokenStarted = true;
