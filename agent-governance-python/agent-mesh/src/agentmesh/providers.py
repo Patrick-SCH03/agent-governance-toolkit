@@ -124,7 +124,7 @@ def get_trust_decay(**kwargs: Any):
     """Get the best available trust decay engine.
 
     Advanced: Trust contagion + KL divergence regime detection.
-    Community: Linear decay over time.
+    Community: NetworkTrustEngine (temporal decay, trust propagation and regime detection).
     """
     provider = _discover_provider(PROVIDER_GROUPS["trust_decay"])
     if provider is not None:
