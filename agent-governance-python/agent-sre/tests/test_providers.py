@@ -34,3 +34,25 @@ def test_getter_without_community_implementation_raises_clear_error(getter, grou
         f"{getter}() has no community implementation ({missing} does not exist). "
         f"Install a provider package that registers an entry point in the '{group}' group."
     )
+
+
+def test_list_providers_marks_slots_without_community_implementation():
+    assert providers.list_providers() == {
+        "slo_detection": "unavailable",
+        "replay_engine": "community",
+        "chaos_engine": "unavailable",
+        "cost_optimizer": "community",
+        "delivery": "community",
+        "incident": "community",
+    }
+
+
+def test_list_providers_reports_advanced_provider_for_slot_without_community_implementation(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        providers,
+        "_discover_provider",
+        lambda group: object if group == "agent_sre.providers.chaos_engine" else None,
+    )
+    assert providers.list_providers()["chaos_engine"] == "advanced"
