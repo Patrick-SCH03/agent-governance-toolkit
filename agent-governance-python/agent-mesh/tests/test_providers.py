@@ -22,3 +22,23 @@ def test_get_trust_decay_falls_back_to_network_trust_engine():
 
 def test_get_capability_engine_falls_back_to_capability_registry():
     assert isinstance(providers.get_capability_engine(), CapabilityRegistry)
+
+
+@pytest.mark.parametrize(
+    "getter, group, missing",
+    [
+        (
+            "get_delegation_chain",
+            "agentmesh.providers.delegation",
+            "agentmesh.identity.delegation.DelegationChain",
+        ),
+        ("get_audit_logger", "agentmesh.providers.audit", "agentmesh.governance.audit.AuditLogger"),
+    ],
+)
+def test_getter_without_community_implementation_raises_clear_error(getter, group, missing):
+    with pytest.raises(NotImplementedError) as exc_info:
+        getattr(providers, getter)()
+    assert str(exc_info.value) == (
+        f"{getter}() has no community implementation ({missing} does not exist). "
+        f"Install a provider package that registers an entry point in the '{group}' group."
+    )
