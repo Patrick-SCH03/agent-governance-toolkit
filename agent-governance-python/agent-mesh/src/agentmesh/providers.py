@@ -120,8 +120,8 @@ def get_trust_decay(**kwargs: Any):
     if provider is not None:
         return provider(**kwargs)
 
-    from agentmesh.reward.trust_decay import TrustDecayEngine
-    return TrustDecayEngine(**kwargs)
+    from agentmesh.reward.trust_decay import NetworkTrustEngine
+    return NetworkTrustEngine(**kwargs)
 
 
 def get_capability_engine(**kwargs: Any):
@@ -134,8 +134,8 @@ def get_capability_engine(**kwargs: Any):
     if provider is not None:
         return provider(**kwargs)
 
-    from agentmesh.trust.capability import CapabilityEngine
-    return CapabilityEngine(**kwargs)
+    from agentmesh.trust.capability import CapabilityRegistry
+    return CapabilityRegistry(**kwargs)
 
 
 def list_providers() -> Dict[str, str]:
