@@ -7,7 +7,7 @@ Enables plug-and-play upgrades from Public Preview to Advanced implementations.
 When an advanced provider package is installed, factory functions automatically
 return the advanced implementation. Otherwise, Public Preview is used where it
 exists; get_delegation_chain() and get_audit_logger() have no Public Preview
-implementation and raise NotImplementedError without an advanced provider.
+implementation, so each raises NotImplementedError without an advanced provider.
 
 Usage:
     from agentmesh.providers import get_reward_engine, get_trust_bridge

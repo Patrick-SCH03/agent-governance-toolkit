@@ -56,3 +56,31 @@ def test_list_providers_reports_advanced_provider_for_slot_without_community_imp
         lambda group: object if group == "agent_sre.providers.chaos_engine" else None,
     )
     assert providers.list_providers()["chaos_engine"] == "advanced"
+
+
+# Getter for each provider slot that has one.
+_GETTERS = {
+    "slo_detection": "get_slo_detector",
+    "replay_engine": "get_replay_engine",
+    "chaos_engine": "get_chaos_engine",
+    "cost_optimizer": "get_cost_optimizer",
+}
+
+
+def test_every_getter_is_mapped_to_a_slot():
+    module_getters = {name for name in dir(providers) if name.startswith("get_")}
+    assert module_getters == set(_GETTERS.values())
+    assert set(_GETTERS) <= set(providers.PROVIDER_GROUPS)
+
+
+@pytest.mark.parametrize("slot, getter", sorted(_GETTERS.items()))
+def test_unavailable_slots_match_getters_that_raise(slot, getter):
+    try:
+        getattr(providers, getter)()
+    except NotImplementedError:
+        raised = True
+    except Exception:
+        raised = False
+    else:
+        raised = False
+    assert raised == (slot in providers._NO_COMMUNITY_IMPLEMENTATION)
